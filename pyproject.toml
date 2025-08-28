@@ -1,0 +1,32 @@
+[project]
+name = "rag-bench"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.31.0",
+    "pydantic>=2.8.0",
+    "tenacity>=8.2.3",
+    "numpy>=1.26.0",
+    "tqdm>=4.66.0",
+    "qdrant-client>=1.7.3",
+    "neo4j>=5.22.0",
+]
+
+[project.scripts]
+rag-benchmark = "rag_bench.cli.benchmark:main"
+rag-retrieval = "rag_bench.cli.retrieval:main"
+rag-qdrant = "rag_bench.cli.qdrant:main"
+rag-neo4j = "rag_bench.cli.neo4j:main"
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["rag_bench*"]

@@ -1,0 +1,407 @@
+{
+  "stage": "run",
+  "result": {
+    "config": {
+      "model": "dengcao/Qwen3-Embedding-0.6B:q8_0",
+      "top_k": 5,
+      "weights": {
+        "alpha": 0.7,
+        "beta": 0.2,
+        "gamma": 0.1
+      },
+      "enable_self_correction": true,
+      "backends": [
+        "qdrant",
+        "neo4j"
+      ]
+    },
+    "summary": {
+      "qdrant": {
+        "recall_at_5": 0.7647058823529411,
+        "mrr_at_5": 0.5313725490196078,
+        "query_latency_ms_mean": 124.24795835281924,
+        "query_latency_ms_p95": 166.10646660010374,
+        "index_time_ms": 0.0,
+        "corrections_applied": 5,
+        "corrections_helped": 2
+      },
+      "neo4j": {
+        "recall_at_5": 0.9411764705882353,
+        "mrr_at_5": 0.6754901960784313,
+        "query_latency_ms_mean": 185.6648480588774,
+        "query_latency_ms_p95": 205.16775020005292,
+        "index_time_ms": 0.0,
+        "corrections_applied": 0,
+        "corrections_helped": 0
+      }
+    },
+    "per_query": {
+      "qdrant": [
+        {
+          "id": 1,
+          "rank": 1,
+          "score": 0.6307317614555359,
+          "latency_ms": 322.28583299911406,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6307317614555359
+          }
+        },
+        {
+          "id": 2,
+          "rank": 1,
+          "score": 0.6421436071395874,
+          "latency_ms": 111.50950000046578,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6421436071395874
+          }
+        },
+        {
+          "id": 3,
+          "rank": 0,
+          "score": 0.0,
+          "latency_ms": 109.69049999948766,
+          "correction_applied": false,
+          "components": {}
+        },
+        {
+          "id": 4,
+          "rank": 0,
+          "score": 0.0,
+          "latency_ms": 109.84429199925216,
+          "correction_applied": true,
+          "components": {}
+        },
+        {
+          "id": 5,
+          "rank": 2,
+          "score": 0.6624017953872681,
+          "latency_ms": 111.88141699858534,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6624017953872681
+          }
+        },
+        {
+          "id": 6,
+          "rank": 1,
+          "score": 0.8945156931877136,
+          "latency_ms": 108.27283299840929,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.8945156931877136
+          }
+        },
+        {
+          "id": 7,
+          "rank": 1,
+          "score": 0.48605185747146606,
+          "latency_ms": 111.35508300139918,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.48605185747146606
+          }
+        },
+        {
+          "id": 8,
+          "rank": 0,
+          "score": 0.0,
+          "latency_ms": 109.89537500063307,
+          "correction_applied": true,
+          "components": {}
+        },
+        {
+          "id": 9,
+          "rank": 5,
+          "score": 0.43101388216018677,
+          "latency_ms": 110.64087500017195,
+          "correction_applied": true,
+          "components": {
+            "semantic": 0.43101388216018677
+          }
+        },
+        {
+          "id": 10,
+          "rank": 2,
+          "score": 0.636888325214386,
+          "latency_ms": 111.01466600121057,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.636888325214386
+          }
+        },
+        {
+          "id": 11,
+          "rank": 0,
+          "score": 0.0,
+          "latency_ms": 110.50095800055715,
+          "correction_applied": true,
+          "components": {}
+        },
+        {
+          "id": 12,
+          "rank": 4,
+          "score": 0.5099335312843323,
+          "latency_ms": 111.14433399961854,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.5099335312843323
+          }
+        },
+        {
+          "id": 13,
+          "rank": 1,
+          "score": 0.6380887031555176,
+          "latency_ms": 127.06162500035134,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6380887031555176
+          }
+        },
+        {
+          "id": 14,
+          "rank": 4,
+          "score": 0.496151328086853,
+          "latency_ms": 111.65983399951074,
+          "correction_applied": true,
+          "components": {
+            "semantic": 0.496151328086853
+          }
+        },
+        {
+          "id": 15,
+          "rank": 1,
+          "score": 0.5315372347831726,
+          "latency_ms": 111.56437499994354,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.5315372347831726
+          }
+        },
+        {
+          "id": 16,
+          "rank": 3,
+          "score": 0.48441454768180847,
+          "latency_ms": 112.54845800067415,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.48441454768180847
+          }
+        },
+        {
+          "id": 17,
+          "rank": 1,
+          "score": 0.47940415143966675,
+          "latency_ms": 111.34533399854263,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.47940415143966675
+          }
+        }
+      ],
+      "neo4j": [
+        {
+          "id": 1,
+          "rank": 1,
+          "score": 0.441512143918394,
+          "latency_ms": 265.12158300101873,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6307316341691344,
+            "entity_jaccard": 0.0,
+            "neighbor_boost": 0.0
+          }
+        },
+        {
+          "id": 2,
+          "rank": 1,
+          "score": 0.6495002728410117,
+          "latency_ms": 185.5375830000412,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6421432469157311,
+            "entity_jaccard": 1.0,
+            "neighbor_boost": 0.0
+          }
+        },
+        {
+          "id": 3,
+          "rank": 0,
+          "score": 0.0,
+          "latency_ms": 174.5664170011878,
+          "correction_applied": false,
+          "components": {}
+        },
+        {
+          "id": 4,
+          "rank": 4,
+          "score": 0.37749077836630096,
+          "latency_ms": 190.17929199981154,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.3964153976661443,
+            "entity_jaccard": 0.5,
+            "neighbor_boost": 0.0
+          }
+        },
+        {
+          "id": 5,
+          "rank": 2,
+          "score": 0.5307320197934249,
+          "latency_ms": 170.28000000027532,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6624021521569528,
+            "entity_jaccard": 0.0,
+            "neighbor_boost": 0.6705051328355799
+          }
+        },
+        {
+          "id": 6,
+          "rank": 1,
+          "score": 0.6887294210820097,
+          "latency_ms": 171.95741700015788,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.8945159068037907,
+            "entity_jaccard": 0.0,
+            "neighbor_boost": 0.6256828631935627
+          }
+        },
+        {
+          "id": 7,
+          "rank": 1,
+          "score": 0.3991508338962707,
+          "latency_ms": 169.1429579987016,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.4860517484412207,
+            "entity_jaccard": 0.09090909090909091,
+            "neighbor_boost": 0.4073279180559805
+          }
+        },
+        {
+          "id": 8,
+          "rank": 5,
+          "score": 0.3662904796917569,
+          "latency_ms": 182.7924580011313,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.38041497098822413,
+            "entity_jaccard": 0.5,
+            "neighbor_boost": 0.0
+          }
+        },
+        {
+          "id": 9,
+          "rank": 3,
+          "score": 0.47711993723121576,
+          "latency_ms": 182.30054199921142,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.43873653542605606,
+            "entity_jaccard": 0.5,
+            "neighbor_boost": 0.7000436243297654
+          }
+        },
+        {
+          "id": 10,
+          "rank": 1,
+          "score": 0.5860713368677051,
+          "latency_ms": 185.93979199977184,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6368881628449149,
+            "entity_jaccard": 0.5,
+            "neighbor_boost": 0.40249622876264646
+          }
+        },
+        {
+          "id": 11,
+          "rank": 2,
+          "score": 0.47668266076068894,
+          "latency_ms": 173.76291700020374,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.39349918921896093,
+            "entity_jaccard": 0.6666666666666666,
+            "neighbor_boost": 0.6789989497408292
+          }
+        },
+        {
+          "id": 12,
+          "rank": 2,
+          "score": 0.5265251025981131,
+          "latency_ms": 182.34745799964003,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.5099336047839322,
+            "entity_jaccard": 0.5,
+            "neighbor_boost": 0.6957157924936066
+          }
+        },
+        {
+          "id": 13,
+          "rank": 1,
+          "score": 0.573605117723531,
+          "latency_ms": 187.5099169992609,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.6380888228486474,
+            "entity_jaccard": 0.5,
+            "neighbor_boost": 0.26942941729477793
+          }
+        },
+        {
+          "id": 14,
+          "rank": 5,
+          "score": 0.38663905716675356,
+          "latency_ms": 186.78612500116287,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.4133008911810214,
+            "entity_jaccard": 0.2,
+            "neighbor_boost": 0.5732843334003861
+          }
+        },
+        {
+          "id": 15,
+          "rank": 1,
+          "score": 0.42583873539176403,
+          "latency_ms": 177.48891699920932,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.53153731935101,
+            "entity_jaccard": 0.06666666666666667,
+            "neighbor_boost": 0.40429278512723776
+          }
+        },
+        {
+          "id": 16,
+          "rank": 1,
+          "score": 0.41332751624488595,
+          "latency_ms": 185.53366600099253,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.4844147604031235,
+            "entity_jaccard": 0.15384615384615385,
+            "neighbor_boost": 0.4346795319346874
+          }
+        },
+        {
+          "id": 17,
+          "rank": 1,
+          "score": 0.3754104196317762,
+          "latency_ms": 185.0553749991377,
+          "correction_applied": false,
+          "components": {
+            "semantic": 0.479404246311048,
+            "entity_jaccard": 0.0,
+            "neighbor_boost": 0.39827447214042566
+          }
+        }
+      ]
+    }
+  }
+}

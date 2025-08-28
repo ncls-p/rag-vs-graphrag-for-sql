@@ -1,0 +1,40 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333" # HTTP
+      - "6334:6334" # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - ragnet
+
+  neo4j:
+    image: neo4j:5.22.0-community
+    container_name: rag-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      NEO4J_AUTH: "neo4j/neo4jtest"
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_server_default__listen__address: "0.0.0.0"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+    networks:
+      - ragnet
+
+volumes:
+  qdrant_data:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_plugins:
+
+networks:
+  ragnet:

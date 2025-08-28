@@ -1,0 +1,26 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ncls/work/konverso/teracloud/rag_bench/src/rag_bench/benchmark.py", line 383, in <module>
+    main()
+    ~~~~^^
+  File "/Users/ncls/work/konverso/teracloud/rag_bench/src/rag_bench/benchmark.py", line 364, in main
+    idx_res = run_index(backends, data_path)
+  File "/Users/ncls/work/konverso/teracloud/rag_bench/src/rag_bench/benchmark.py", line 92, in run_index
+    idx = qio.index_dataset(data_path=data_path)
+  File "/Users/ncls/work/konverso/teracloud/rag_bench/src/rag_bench/qdrant_io.py", line 81, in index_dataset
+    self.ensure_collection(dim, qmodels.Distance.COSINE)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ncls/work/konverso/teracloud/rag_bench/src/rag_bench/qdrant_io.py", line 55, in ensure_collection
+    self.client.create_collection(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        collection_name=self.collection,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        vectors=qmodels.VectorParams(size=vector_size, distance=distance),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/ncls/work/konverso/teracloud/rag_bench/.venv/lib/python3.13/site-packages/qdrant_client/qdrant_client.py", line 2380, in create_collection
+    assert len(kwargs) == 0, f"Unknown arguments: {list(kwargs.keys())}"
+           ^^^^^^^^^^^^^^^^
+AssertionError: Unknown arguments: ['vectors']
