@@ -78,6 +78,7 @@ class QdrantIO:
         per_format_batches: Dict[str, List[qmodels.PointStruct]] = {}
         per_format_counts: Dict[str, int] = {}
         per_format_dim: Dict[str, int] = {}
+        skipped = 0
 
         # Progress metadata
         total_records = len(records)
@@ -132,7 +133,16 @@ class QdrantIO:
                 except Exception:
                     pass
             text = combined_text(rec)
-            vec = embedder.embed_one(text).vector
+            vec: Optional[List[float]] = None
+            # Outer retry around embedder (which already retries internally)
+            try:
+                vec = embedder.embed_one(text).vector
+            except Exception:
+                try:
+                    vec = embedder.embed_one(text).vector
+                except Exception:
+                    skipped += 1
+                    continue
             if dim is None:
                 dim = len(vec)
                 if not dim or dim <= 0:
@@ -184,6 +194,7 @@ class QdrantIO:
             "base_collection": self.base_collection,
             "per_format_counts": per_format_counts,
             "vector_size": dim or 0,
+            "skipped": skipped,
         }
 
     def search(

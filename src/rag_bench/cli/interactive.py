@@ -125,7 +125,13 @@ def _index() -> None:
     if "qdrant" in backends:
         import time
 
-        from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
 
         console.print(
             f"[bold cyan]Indexing Qdrant[/bold cyan] • URL: {cfg.qdrant_url} • Base collection: {QdrantIO(cfg).base_collection}"
@@ -138,9 +144,8 @@ def _index() -> None:
         with Progress(
             TextColumn("{task.description}"),
             BarColumn(),
-            TextColumn("{task.percentage:>3.0f}%"),
-            TextColumn("• {task.completed}/{task.total}"),
             TimeElapsedColumn(),
+            TimeRemainingColumn(),
             transient=True,
             console=console,
         ) as progress:
@@ -179,15 +184,19 @@ def _index() -> None:
                 res = qio.index_dataset(Path(data_path), progress=_qcb)
                 results["qdrant"] = res
             except Exception as e:
-                _error(f"Qdrant index failed: {e}")
-                Confirm.ask("Back to menu?", default=True)
-                return
+                _error(f"Qdrant index failed: {e}. Continuing to other backends...")
 
     # Neo4j
     if "neo4j" in backends:
         import time
 
-        from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
 
         console.print(f"[bold cyan]Indexing Neo4j[/bold cyan] • URI: {cfg.neo4j_uri}")
         n4j = Neo4jIO(cfg, use_read_only=False)
@@ -199,9 +208,8 @@ def _index() -> None:
             with Progress(
                 TextColumn("{task.description}"),
                 BarColumn(),
-                TextColumn("{task.percentage:>3.0f}%"),
-                TextColumn("• {task.completed}/{task.total}"),
                 TimeElapsedColumn(),
+                TimeRemainingColumn(),
                 transient=True,
                 console=console,
             ) as progress:
@@ -240,11 +248,10 @@ def _index() -> None:
                     "entities": stats.entities,
                     "mentions": stats.mentions,
                     "refers_to": stats.refers_to,
+                    "skipped": getattr(stats, "skipped", 0),
                 }
         except Exception as e:
             _error(f"Neo4j ingest failed: {e}")
-            Confirm.ask("Back to menu?", default=True)
-            return
         finally:
             try:
                 n4j.close()

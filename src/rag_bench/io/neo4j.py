@@ -29,6 +29,7 @@ class IngestStats:
     entities: int
     mentions: int
     refers_to: int
+    skipped: int = 0
 
 
 class Neo4jIO:
@@ -173,6 +174,7 @@ class Neo4jIO:
         doc_count = 0
         ent_count = 0
         mention_count = 0
+        skipped_count = 0
 
         # Progress metadata
         total_records = len(records)
@@ -225,19 +227,38 @@ class Neo4jIO:
                     except Exception:
                         pass
                 text = combined_text(rec)
-                vec = embedder.embed_one(text).vector
+                vec: Optional[List[float]] = None
+                try:
+                    vec = embedder.embed_one(text).vector
+                except Exception:
+                    try:
+                        vec = embedder.embed_one(text).vector
+                    except Exception:
+                        skipped_count += 1
+                        continue
 
-                s.execute_write(self._merge_document_tx, rec, vec)
+                # Write document and entities with per-op safety
+                try:
+                    s.execute_write(self._merge_document_tx, rec, vec)
+                except Exception:
+                    skipped_count += 1
+                    continue
                 doc_count += 1
 
                 ents: List[str] = list(rec.get("entities", []) or [])
                 doc_to_entities[rec["id"]] = set(ents)
                 for e in ents:
                     kind = _classify_entity(e)
-                    s.execute_write(self._merge_entity_and_rel_tx, rec["id"], e, kind)
-                    ent_count += 1
-                    mention_count += 1
-                    entity_to_docs[e].add(rec["id"])
+                    try:
+                        s.execute_write(
+                            self._merge_entity_and_rel_tx, rec["id"], e, kind
+                        )
+                        ent_count += 1
+                        mention_count += 1
+                        entity_to_docs[e].add(rec["id"])
+                    except Exception:
+                        # skip this entity relation but continue others
+                        continue
 
         refers_to_count = 0
         if create_refers_to:
@@ -275,6 +296,7 @@ class Neo4jIO:
             entities=ent_count,
             mentions=mention_count,
             refers_to=refers_to_count,
+            skipped=skipped_count,
         )
 
     def stats(self) -> Dict[str, int]:
