@@ -40,8 +40,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     p_index.add_argument(
         "--data",
         "-d",
-        default=str(Path("data") / "qa.json"),
-        help="Path to dataset file or directory (json/jsonl/ndjson/txt/xml)",
+        default=str(Path("data")),
+        help=(
+            "Path to dataset file or directory (json/jsonl/ndjson/txt/xml). "
+            "Defaults to 'data', which includes data/output, data/output_json, data/output_xml."
+        ),
     )
     p_index.add_argument("--batch-size", type=int, default=32, help="Upsert batch size")
     p_index.add_argument(

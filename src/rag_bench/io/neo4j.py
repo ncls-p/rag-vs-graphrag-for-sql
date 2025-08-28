@@ -3,13 +3,13 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from neo4j import GraphDatabase
 
 from ..config import Config
-from ..embeddings import OllamaEmbedder
 from ..dataloader import load_records
+from ..embeddings import OllamaEmbedder
 from ..utils.text import combined_text
 
 
@@ -157,6 +157,7 @@ class Neo4jIO:
         data_path: Path,
         batch_size: int = 32,
         create_refers_to: bool = True,
+        progress: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> IngestStats:
         records = load_records(data_path)
         if not records:
@@ -173,8 +174,56 @@ class Neo4jIO:
         ent_count = 0
         mention_count = 0
 
+        # Progress metadata
+        total_records = len(records)
+        files_order: List[str] = []
+        seen_files: Set[str] = set()
+        for rec in records:
+            sp = str(rec.get("source_path") or "")
+            if sp and sp not in seen_files:
+                seen_files.add(sp)
+                files_order.append(sp)
+        total_files = len(files_order) if files_order else 1
+        file_index = 0
+        current_file: Optional[str] = None
+        processed = 0
+        if progress:
+            try:
+                progress(
+                    {
+                        "backend": "neo4j",
+                        "total_files": total_files,
+                        "total_records": total_records,
+                        "file_index": 0,
+                        "file_path": None,
+                        "record_index": 0,
+                    }
+                )
+            except Exception:
+                pass
+
         with self.driver.session() as s:
             for i, rec in enumerate(records, start=1):
+                # Progress
+                spath = str(rec.get("source_path") or "")
+                if spath and spath != current_file:
+                    current_file = spath
+                    file_index += 1
+                processed += 1
+                if progress:
+                    try:
+                        progress(
+                            {
+                                "backend": "neo4j",
+                                "total_files": total_files,
+                                "total_records": total_records,
+                                "file_index": file_index,
+                                "file_path": current_file,
+                                "record_index": processed,
+                            }
+                        )
+                    except Exception:
+                        pass
                 text = combined_text(rec)
                 vec = embedder.embed_one(text).vector
 

@@ -197,14 +197,11 @@ def _gather_paths(dir_path: Path) -> List[Path]:
     for pat in patterns:
         files.extend(dir_path.rglob(pat))
 
-    # Exclude noisy/derived output folders and hidden dirs
+    # Exclude hidden dirs only (we DO want data/output* trees)
     def _skip(p: Path) -> bool:
         parts = [str(x) for x in p.parts]
         for part in parts:
             if part.startswith("."):
-                return True
-            lp = part.lower()
-            if lp.startswith("output"):
                 return True
         return False
 
@@ -239,16 +236,19 @@ def load_records(path: Path) -> List[Dict[str, Any]]:
                 recs = _parse_json_file(path)
                 for r in recs:
                     r["source_format"] = "json"
+                    r["source_path"] = str(path)
                 records.extend(recs)
             elif suffix == ".xml":
                 recs = _parse_xml_file(path)
                 for r in recs:
                     r["source_format"] = "xml"
+                    r["source_path"] = str(path)
                 records.extend(recs)
             elif suffix == ".txt":
                 recs = _parse_txt_file(path)
                 for r in recs:
                     r["source_format"] = "txt"
+                    r["source_path"] = str(path)
                 records.extend(recs)
             else:
                 # Unknown extension: attempt JSON, then XML, then TXT
@@ -256,23 +256,27 @@ def load_records(path: Path) -> List[Dict[str, Any]]:
                     recs = _parse_json_file(path)
                     for r in recs:
                         r["source_format"] = "json"
+                        r["source_path"] = str(path)
                     records.extend(recs)
                 except Exception:
                     try:
                         recs = _parse_xml_file(path)
                         for r in recs:
                             r["source_format"] = "xml"
+                            r["source_path"] = str(path)
                         records.extend(recs)
                     except Exception:
                         recs = _parse_txt_file(path)
                         for r in recs:
                             r["source_format"] = "txt"
+                            r["source_path"] = str(path)
                         records.extend(recs)
         except Exception:
             # As a last resort, try plain text
             recs = _parse_txt_file(path)
             for r in recs:
                 r["source_format"] = "txt"
+                r["source_path"] = str(path)
             records.extend(recs)
 
     # Assign unique ids if missing or duplicated

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
 from ..config import Config
-from ..embeddings import OllamaEmbedder
 from ..dataloader import load_records
+from ..embeddings import OllamaEmbedder
 from ..utils.text import combined_text
 
 
@@ -58,6 +58,7 @@ class QdrantIO:
         data_path: Path,
         batch_size: int = 32,
         warmup: bool = True,
+        progress: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         records = load_records(data_path)
         if not records:
@@ -78,10 +79,58 @@ class QdrantIO:
         per_format_counts: Dict[str, int] = {}
         per_format_dim: Dict[str, int] = {}
 
+        # Progress metadata
+        total_records = len(records)
+        files_order: List[str] = []
+        seen_files: set[str] = set()
+        for rec in records:
+            sp = str(rec.get("source_path") or "")
+            if sp and sp not in seen_files:
+                seen_files.add(sp)
+                files_order.append(sp)
+        total_files = len(files_order) if files_order else 1
+        file_index = 0
+        current_file: Optional[str] = None
+        processed = 0
+        if progress:
+            try:
+                progress(
+                    {
+                        "backend": "qdrant",
+                        "total_files": total_files,
+                        "total_records": total_records,
+                        "file_index": 0,
+                        "file_path": None,
+                        "record_index": 0,
+                    }
+                )
+            except Exception:
+                pass
+
         for rec in records:
             rid = rec.get("id")
             if rid is None:
                 continue
+            # Progress update on file boundary
+            spath = str(rec.get("source_path") or "")
+            if spath and spath != current_file:
+                current_file = spath
+                file_index += 1
+            processed += 1
+            if progress:
+                try:
+                    progress(
+                        {
+                            "backend": "qdrant",
+                            "total_files": total_files,
+                            "total_records": total_records,
+                            "file_index": file_index,
+                            "file_path": current_file,
+                            "record_index": processed,
+                        }
+                    )
+                except Exception:
+                    pass
             text = combined_text(rec)
             vec = embedder.embed_one(text).vector
             if dim is None:

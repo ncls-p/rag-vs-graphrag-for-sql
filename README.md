@@ -11,6 +11,7 @@ Benchmark and compare Retrieval-Augmented Generation (RAG) backends for SQL-orie
 - [Run Services (Docker)](#run-services-docker)
 - [Configuration](#configuration)
 - [Quickstart](#quickstart)
+- [Interactive CLI](#interactive-cli)
 - [CLI Reference](#cli-reference)
 - [Data Formats](#data-formats)
 - [Retrieval Details](#retrieval-details)
@@ -31,8 +32,9 @@ rag-bench indexes question/answer pairs (including DDL/SQL snippets), runs retri
 ## Architecture & Workflow
 1. Load & normalize data
    - Inputs: .json/.jsonl/.ndjson, .txt, .xml (file or directory)
-   - Each record → id, question, answer_text, entities, doc_type, tags, source_format
-   - Derived folders starting with `output` are ignored
+   - Knowledge base source: contents under `data/output`, `data/output_json`, `data/output_xml`
+   - Evaluation queries: `data/qa.json` (used to drive retrieval + LLM, not stored as KB)
+   - Each normalized record → id, question, answer_text, entities, doc_type, tags, source_format
 2. Index
    - Qdrant: per-format collections `<QDRANT_COLLECTION>_{json,txt,xml}`
    - Neo4j: Document nodes (+ embedding, entities, doc_type, source_format), Entity nodes, MENTIONS edges, REFERS_TO edges between docs that share entities
@@ -111,15 +113,28 @@ export NEO4J_PASSWORD=neo4jtest
 # 3) Health check
 rag-benchmark --health
 
-# 4) Index both backends
-rag-benchmark --stage index --backends qdrant,neo4j --data data/qa.json
+# 4) Build the knowledge base from data/output*
+rag-benchmark --stage index --backends qdrant,neo4j --data data
 
-# 5) Run benchmark and write report
+# 5) Run benchmark using QA queries (data/qa.json) and write report
 rag-benchmark --stage run --backends qdrant,neo4j --data data/qa.json --out output/benchmark_results.json
 
 # 6) Per-format comparison (isolation)
 rag-benchmark --stage run --backends qdrant,neo4j --data data --formats json,txt,xml --out output/benchmark_by_format.json
 ```
+
+## Interactive CLI
+Launch the interactive, styled console to run health checks, index the KB, search, view stats, and run benchmarks without remembering flags.
+
+```bash
+# After installing with -e .
+rag
+```
+
+Features:
+- Guided prompts for selecting backends and paths
+- Pretty tables and panels for results
+- Safe confirmation flow for destructive operations (Neo4j drop)
 
 ## CLI Reference
 Console scripts installed by `-e .`:
@@ -144,13 +159,13 @@ rag-retrieval neo4j --query "Which table provides CICS transaction stats?" --top
 
 ### rag-qdrant
 ```bash
-rag-qdrant index --data data/qa.json
+rag-qdrant index --data data
 rag-qdrant search --query "top Db2 packages" --top-k 5 --format json
 ```
 
 ### rag-neo4j
 ```bash
-rag-neo4j ingest --data data/qa.json
+rag-neo4j ingest --data data
 rag-neo4j stats
 ALLOW_DESTRUCTIVE_OPS=true rag-neo4j drop
 ```
@@ -162,9 +177,9 @@ PYTHONPATH=src python -m rag_bench.retrieval qdrant --query "..."
 ```
 
 ## Data Formats
-- JSON/JSONL/NDJSON: objects or line-delimited; nested arrays supported
-- TXT: "qa.txt" style with `@` question markers; fallback uses first non-empty line as question
-- XML: best-effort search for `<question>`/`<answer>`; otherwise treat content as text
+- TXT under `data/output`: table docs, DDL, descriptions; parser falls back to one-record-per-file when not `@qa`-formatted
+- JSON under `data/output_json`: arrays/objects supported; normalized to the shared schema
+- XML under `data/output_xml`: extracted text from tag heuristics; normalized to the shared schema
 - Each record gets `source_format` (json/txt/xml) and an inferred `doc_type` (DDL, SQL_QUERY, or PLAIN)
 
 ## Retrieval Details
@@ -185,7 +200,7 @@ Result JSON contains:
 - Qdrant: check `QDRANT_URL` and container health (`curl http://localhost:6333/`)
 - Neo4j auth: ensure `NEO4J_USER/NEO4J_PASSWORD` match your instance
 - Vector size mismatch in Qdrant: recreate the collection or change `QDRANT_COLLECTION`
-- Ensure derived outputs live under `output*/` so the loader ignores them
+- Loader now includes `data/output*`; if you want to exclude something, move it out of `data/` or pass a narrower `--data` path
 
 ## Development
 - Modular layout: `cli/`, `io/`, `retrievals/`, `bench/`, `utils/`
