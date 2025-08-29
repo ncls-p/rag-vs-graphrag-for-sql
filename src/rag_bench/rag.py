@@ -33,7 +33,16 @@ def _format_contexts(hits, max_chars: int = 6000) -> List[Dict[str, Any]]:
         content = str(content)
         if total + len(content) > max_chars:
             content = content[: max(0, max_chars - total)]
-        out.append({"id": h.id, "score": h.score, "content": content})
+        entry = {
+            "id": h.id,
+            "score": h.score,
+            "content": content,
+        }
+        # Include source_format if available
+        sf = payload.get("source_format")
+        if sf:
+            entry["source_format"] = sf
+        out.append(entry)
         total += len(content)
         if total >= max_chars:
             break
@@ -222,7 +231,7 @@ def answer_question(
     top_k: Optional[int] = None,
     source_format: Optional[str] = None,
     source_formats: Optional[List[str]] = None,
-    temperature: float = 1,
+    temperature: float = 0.2,
     max_tokens: Optional[int] = None,
     retrieval_query: Optional[str] = None,
 ) -> RagAnswer:
@@ -253,7 +262,11 @@ def answer_question(
     contexts = _format_contexts(hits)
     ctx_text = "\n\n".join(f"[doc:{c['id']}]\n{c['content']}" for c in contexts)
 
-    system = "You are a helpful assistant. Answer strictly using the provided context. If the answer is not in the context, say you don't know."
+    system = (
+        "You are a helpful assistant. Answer strictly using the provided context. "
+        "If the answer is not in the context, say you don't know. "
+        "If SQL is requested, return a valid query in a ```sql code block."
+    )
     user = f"Question:\n{question}\n\nRetrieval query:\n{retrieval_query or question}\n\nContext:\n{ctx_text}"
 
     chat = OpenAIChat()

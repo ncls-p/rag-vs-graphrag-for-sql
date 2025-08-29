@@ -13,6 +13,7 @@ Benchmark and compare Retrieval-Augmented Generation (RAG) backends for SQL-orie
 - [Quickstart](#quickstart)
 - [Interactive CLI](#interactive-cli)
 - [CLI Reference](#cli-reference)
+- [RAG Batch Ask](#rag-batch-ask)
 - [Data Formats](#data-formats)
 - [Retrieval Details](#retrieval-details)
 - [Benchmark Output](#benchmark-output)
@@ -171,6 +172,23 @@ rag-neo4j ingest --data data
 rag-neo4j stats
 ALLOW_DESTRUCTIVE_OPS=true rag-neo4j drop
 ```
+
+### rag-batch-ask
+Batch question answering over a list of questions (JSON/JSONL). For each question, the LLM first generates a retrieval query, then the retriever fetches top‑K documents (default 20), and the LLM answers using the retrieved context. Results are written to a JSON file with question, answer, generated query, contexts (with confidence scores), and usage stats.
+
+```bash
+# Example questions file
+cat data/qa_rag_batch.jsonl
+
+rag-batch-ask --in data/qa_rag_batch.jsonl --out output/batch_answers.json \
+  --backend qdrant --format json --top-k 20 --temperature 0.2
+```
+
+Output schema (array):
+- backend, model
+- question, retrieval_query, answer
+- contexts: [{id, score, source_format?, content}]
+- usage: {prompt_tokens?, completion_tokens?, total_tokens?, elapsed_ms}
 
 Module invocation (alternative):
 ```bash

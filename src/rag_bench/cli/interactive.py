@@ -17,6 +17,7 @@ from ..io.qdrant import QdrantIO
 from ..retrievals.neo4j import Neo4jRetriever
 from ..retrievals.qdrant import QdrantRetriever
 from ..rag import answer_question, generate_search_query
+from .batch_ask import main as batch_ask_main
 
 console = Console()
 
@@ -419,6 +420,52 @@ def _ask() -> None:
     Confirm.ask("Back to menu?", default=True)
 
 
+def _pick_formats_multi(defaults: Optional[List[str]] = None) -> List[str]:
+    return _checkbox(
+        "Select formats",
+        options=[("JSON", "json"), ("TXT", "txt"), ("XML", "xml")],
+        default_selected=(defaults or ["json", "txt", "xml"]),
+    )
+
+
+def _batch_ask() -> None:
+    _header("Batch Ask (RAG)")
+    in_path = Prompt.ask("Questions file (JSON/JSONL)", default=str(Path("data") / "qa_rag_batch.jsonl"))
+    out_path = Prompt.ask("Output file", default=str(Path("output") / "batch_answers.json"))
+    # Pick multiple backends
+    backends = _pick_backends(["qdrant", "neo4j"])
+    if not backends:
+        backends = ["qdrant", "neo4j"]
+    # Pick multiple formats
+    fmts = _pick_formats_multi(["json", "txt", "xml"])
+    tk = Prompt.ask("Top-K", default="20")
+    temp = Prompt.ask("LLM temperature", default="0.2")
+    instr = Prompt.ask("Custom gen-instruction (optional)", default="")
+
+    argv = [
+        "--in",
+        in_path,
+        "--out",
+        out_path,
+        "--backends",
+        ",".join(backends),
+        "--top-k",
+        tk,
+        "--temperature",
+        temp,
+    ]
+    if fmts:
+        argv += ["--formats", ",".join(fmts)]
+    if instr:
+        argv += ["--gen-instruction", instr]
+    try:
+        batch_ask_main(argv)
+        _ok(f"Wrote {out_path}")
+    except Exception as e:
+        _error(str(e))
+    Confirm.ask("Back to menu?", default=True)
+
+
 def _stats() -> None:
     _header("Neo4j Stats")
     cfg = Config()
@@ -637,6 +684,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             ("Index Knowledge Base", "index"),
             ("Search", "search"),
             ("Ask (RAG)", "ask"),
+            ("Batch Ask (RAG)", "batch_ask"),
             ("Neo4j Stats", "stats"),
             ("Benchmark", "bench"),
             ("Danger: Drop Qdrant Collections", "drop_qdrant"),
@@ -663,6 +711,8 @@ def main(argv: Optional[List[str]] = None) -> None:
             _search()
         elif choice == "ask":
             _ask()
+        elif choice == "batch_ask":
+            _batch_ask()
         elif choice == "stats":
             _stats()
         elif choice == "bench":
