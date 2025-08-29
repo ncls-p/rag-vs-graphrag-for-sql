@@ -176,7 +176,7 @@ def answer_question(
     top_k: Optional[int] = None,
     source_format: Optional[str] = None,
     source_formats: Optional[List[str]] = None,
-    temperature: float = 0.2,
+    temperature: float = 1,
     max_tokens: Optional[int] = None,
     retrieval_query: Optional[str] = None,
 ) -> RagAnswer:

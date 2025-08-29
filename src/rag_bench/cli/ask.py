@@ -20,7 +20,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         default=None,
         help="Custom instruction to guide query generation",
     )
-    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--temperature", type=float, default=1)
     p.add_argument("--max-tokens", type=int, default=None)
     args = p.parse_args(argv)
 

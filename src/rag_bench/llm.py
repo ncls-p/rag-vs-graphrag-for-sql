@@ -37,7 +37,7 @@ class OpenAIChat:
     def chat(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.2,
+        temperature: float = 1,
         max_tokens: Optional[int] = None,
         extra: Optional[Dict[str, Any]] = None,
     ) -> ChatResponse:

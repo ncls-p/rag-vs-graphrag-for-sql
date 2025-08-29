@@ -360,11 +360,11 @@ def _ask() -> None:
         return
     fmt_list = _pick_format()
     sf = fmt_list[0] if fmt_list else None
-    temp_str = Prompt.ask("LLM temperature", default="0.2")
+    temp_str = Prompt.ask("LLM temperature", default="1")
     try:
         temperature = float(temp_str)
     except Exception:
-        temperature = 0.2
+        temperature = 1
     tk_str = Prompt.ask("Top-K to retrieve", default="20")
     try:
         top_k = int(tk_str)
