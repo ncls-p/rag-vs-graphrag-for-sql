@@ -7,7 +7,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
 from ..config import Config
-from ..dataloader import load_records
+from ..fileloader import load_files
 from ..embeddings import OllamaEmbedder
 from ..utils.text import combined_text
 
@@ -60,8 +60,8 @@ class QdrantIO:
         warmup: bool = True,
         progress: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
-        records = load_records(data_path)
-        if not records:
+        files = load_files(data_path)
+        if not files:
             return {"indexed": 0, "batches": 0}
 
         embedder = OllamaEmbedder()
@@ -81,11 +81,11 @@ class QdrantIO:
         skipped = 0
 
         # Progress metadata
-        total_records = len(records)
+        total_records = len(files)
         files_order: List[str] = []
         seen_files: set[str] = set()
-        for rec in records:
-            sp = str(rec.get("source_path") or "")
+        for f in files:
+            sp = f.source_path
             if sp and sp not in seen_files:
                 seen_files.add(sp)
                 files_order.append(sp)
@@ -108,12 +108,10 @@ class QdrantIO:
             except Exception:
                 pass
 
-        for rec in records:
-            rid = rec.get("id")
-            if rid is None:
-                continue
+        for f in files:
+            rid = f.id
             # Progress update on file boundary
-            spath = str(rec.get("source_path") or "")
+            spath = f.source_path
             if spath and spath != current_file:
                 current_file = spath
                 file_index += 1
@@ -132,7 +130,7 @@ class QdrantIO:
                     )
                 except Exception:
                     pass
-            text = combined_text(rec)
+            text = f.content
             vec: Optional[List[float]] = None
             # Outer retry around embedder (which already retries internally)
             try:
@@ -150,17 +148,14 @@ class QdrantIO:
                         "Embedding dimension is 0; check Ollama embeddings response"
                     )
             payload = {
-                "id": rec.get("id"),
-                "question": rec.get("question"),
-                "answer_text": rec.get("answer_text"),
-                "entities": rec.get("entities", []),
-                "doc_type": rec.get("doc_type"),
-                "tags": rec.get("tags", []),
-                "source_format": rec.get("source_format", "unknown"),
+                "id": rid,
+                "path": f.source_path,
+                "source_format": f.source_format,
+                "size_bytes": f.size_bytes,
             }
             point = qmodels.PointStruct(id=rid, vector=vec, payload=payload)
 
-            sf = str(rec.get("source_format", "unknown")).lower()
+            sf = f.source_format
             col = self._collection_name(sf)
             if sf not in per_format_batches:
                 per_format_batches[sf] = []

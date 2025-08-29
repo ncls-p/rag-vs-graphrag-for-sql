@@ -26,6 +26,8 @@ rag-bench indexes question/answer pairs (including DDL/SQL snippets), runs retri
 ## Features
 - Dual backends: Qdrant (semantic ANN) and Neo4j (semantic + entity + neighbor signals)
 - Format isolation: JSON/TXT/XML stored and evaluated independently
+- Qdrant: separate collections per format (`<base>_json`, `<base>_txt`, `<base>_xml`)
+- Neo4j: per-format labels, per-format Entity nodes, and same-format-only edges (no cross-format links)
 - Self-correction: retries with entity-augmented queries when needed
 - Clean CLIs: health checks, indexing, benchmarking, ingesting, searching, stats
 
@@ -37,7 +39,7 @@ rag-bench indexes question/answer pairs (including DDL/SQL snippets), runs retri
    - Each normalized record → id, question, answer_text, entities, doc_type, tags, source_format
 2. Index
    - Qdrant: per-format collections `<QDRANT_COLLECTION>_{json,txt,xml}`
-   - Neo4j: Document nodes (+ embedding, entities, doc_type, source_format), Entity nodes, MENTIONS edges, REFERS_TO edges between docs that share entities
+   - Neo4j: Document nodes (+ embedding, entities, doc_type, source_format), per-format Entity nodes, MENTIONS edges, and REFERS_TO edges only within the same format
 3. Retrieve
    - Qdrant: nearest-neighbor over embeddings (format restriction supported)
    - Neo4j: composite score = alpha*semantic + beta*entity_jaccard + gamma*neighbor_boost

@@ -8,19 +8,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from neo4j import GraphDatabase
 
 from ..config import Config
-from ..dataloader import load_records
+from ..fileloader import load_files, FileItem
 from ..embeddings import OllamaEmbedder
-from ..utils.text import combined_text
-
-
-def _classify_entity(name: str) -> str:
-    if "." in name:
-        return "COLUMN"
-    if "_" in name:
-        return "TABLE"
-    if name.isupper():
-        return "TABLE"
-    return "UNKNOWN"
 
 
 @dataclass
@@ -67,8 +56,8 @@ class Neo4jIO:
     # Admin / constraints
     def ensure_constraints(self) -> None:
         stmts = [
+            # Keep document id uniqueness; no Entity constraints in file-based ingestion
             "CREATE CONSTRAINT document_id IF NOT EXISTS FOR (d:Document) REQUIRE d.id IS UNIQUE",
-            "CREATE CONSTRAINT entity_name IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE",
         ]
         with self.driver.session() as s:
             for cql in stmts:
@@ -98,60 +87,63 @@ class Neo4jIO:
     # Ingestion
     @staticmethod
     def _merge_document_tx(tx, rec: Dict[str, Any], embedding: List[float]) -> None:
-        sf = (rec.get("source_format") or "unknown").lower()
+        # Back-compat signature kept, but we expect a FileItem-like dict
+        sf = (rec.get("source_format") or rec.get("sf") or "unknown").lower()
         tx.run(
             """
             MERGE (d:Document {id: $id})
-            SET d.question = $question,
-                d.answer_text = $answer_text,
-                d.entities = $entities,
-                d.doc_type = $doc_type,
+            SET d.path = $path,
                 d.source_format = $source_format,
+                d.size_bytes = $size_bytes,
                 d.embedding = $embedding
             FOREACH (_ IN CASE WHEN $sf = 'json' THEN [1] ELSE [] END | SET d:JSON)
             FOREACH (_ IN CASE WHEN $sf = 'txt' THEN [1] ELSE [] END | SET d:TXT)
             FOREACH (_ IN CASE WHEN $sf = 'xml' THEN [1] ELSE [] END | SET d:XML)
             """,
             id=rec["id"],
-            question=rec.get("question", ""),
-            answer_text=rec.get("answer_text", ""),
-            entities=rec.get("entities", []),
-            doc_type=rec.get("doc_type", "PLAIN"),
+            path=rec.get("source_path") or rec.get("path", ""),
             source_format=rec.get("source_format", "unknown"),
+            size_bytes=int(rec.get("size_bytes", 0)),
             sf=sf,
             embedding=embedding,
         )
 
-    @staticmethod
-    def _merge_entity_and_rel_tx(tx, doc_id: int, ent_name: str, kind: str) -> None:
-        tx.run(
-            """
-            MERGE (e:Entity {name: $name})
-            ON CREATE SET e.kind = $kind
-            WITH e
-            MATCH (d:Document {id: $doc_id})
-            MERGE (d)-[:MENTIONS]->(e)
-            """,
-            name=ent_name,
-            kind=kind,
-            doc_id=doc_id,
-        )
+    # No Entity graph in file-based ingestion
 
     @staticmethod
-    def _merge_refers_to_tx(tx, a: int, b: int, overlap: int, jaccard: float) -> None:
+    def _merge_refers_to_tx(tx, a: int, b: int, reason: str) -> None:
         tx.run(
             """
             MERGE (da:Document {id: $a})
             MERGE (db:Document {id: $b})
             MERGE (da)-[r:REFERS_TO]->(db)
-            SET r.overlap_count = $overlap,
-                r.jaccard = $jaccard
+            SET r.reason = $reason
             """,
             a=a,
             b=b,
-            overlap=overlap,
-            jaccard=jaccard,
+            reason=reason,
         )
+
+    # --- Foreign key heuristics (DDL text) ---
+    @staticmethod
+    def _extract_table_defs(text: str) -> List[str]:
+        import re
+        names: List[str] = []
+        for m in re.finditer(r"(?is)\bCREATE\s+TABLE\s+([`\"]?[A-Za-z_][\w$.]*[`\"]?)", text):
+            raw = m.group(1)
+            norm = raw.strip().strip('`"').upper()
+            names.append(norm)
+        return names
+
+    @staticmethod
+    def _extract_fk_refs(text: str) -> List[str]:
+        import re
+        refs: List[str] = []
+        for m in re.finditer(r"(?is)\bREFERENCES\s+([`\"]?[A-Za-z_][\w$.]*[`\"]?)", text):
+            raw = m.group(1)
+            norm = raw.strip().strip('`"').upper()
+            refs.append(norm)
+        return refs
 
     def ingest(
         self,
@@ -160,16 +152,18 @@ class Neo4jIO:
         create_refers_to: bool = True,
         progress: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> IngestStats:
-        records = load_records(data_path)
-        if not records:
+        files = load_files(data_path)
+        if not files:
             return IngestStats(documents=0, entities=0, mentions=0, refers_to=0)
 
         self.ensure_constraints()
 
         embedder = OllamaEmbedder()
 
-        entity_to_docs: Dict[str, Set[int]] = defaultdict(set)
-        doc_to_entities: Dict[int, Set[str]] = {}
+        # File-based graph pre-pass for FK edges
+        tables_by_format: Dict[str, Dict[str, int]] = defaultdict(dict)  # sf -> table -> doc_id
+        fkrels_by_file: Dict[int, List[str]] = defaultdict(list)
+        doc_to_format: Dict[int, str] = {}
 
         doc_count = 0
         ent_count = 0
@@ -177,11 +171,11 @@ class Neo4jIO:
         skipped_count = 0
 
         # Progress metadata
-        total_records = len(records)
+        total_records = len(files)
         files_order: List[str] = []
         seen_files: Set[str] = set()
-        for rec in records:
-            sp = str(rec.get("source_path") or "")
+        for f in files:
+            sp = f.source_path
             if sp and sp not in seen_files:
                 seen_files.add(sp)
                 files_order.append(sp)
@@ -205,9 +199,9 @@ class Neo4jIO:
                 pass
 
         with self.driver.session() as s:
-            for i, rec in enumerate(records, start=1):
+            for i, item in enumerate(files, start=1):
                 # Progress
-                spath = str(rec.get("source_path") or "")
+                spath = item.source_path
                 if spath and spath != current_file:
                     current_file = spath
                     file_index += 1
@@ -226,7 +220,7 @@ class Neo4jIO:
                         )
                     except Exception:
                         pass
-                text = combined_text(rec)
+                text = item.content
                 vec: Optional[List[float]] = None
                 try:
                     vec = embedder.embed_one(text).vector
@@ -239,57 +233,53 @@ class Neo4jIO:
 
                 # Write document and entities with per-op safety
                 try:
-                    s.execute_write(self._merge_document_tx, rec, vec)
+                    # pass dict-like for back-compat
+                    s.execute_write(
+                        self._merge_document_tx,
+                        {
+                            "id": item.id,
+                            "source_path": item.source_path,
+                            "source_format": item.source_format,
+                            "size_bytes": item.size_bytes,
+                        },
+                        vec,
+                    )
                 except Exception:
                     skipped_count += 1
                     continue
                 doc_count += 1
 
-                ents: List[str] = list(rec.get("entities", []) or [])
-                doc_to_entities[rec["id"]] = set(ents)
-                for e in ents:
-                    kind = _classify_entity(e)
-                    try:
-                        s.execute_write(
-                            self._merge_entity_and_rel_tx, rec["id"], e, kind
-                        )
-                        ent_count += 1
-                        mention_count += 1
-                        entity_to_docs[e].add(rec["id"])
-                    except Exception:
-                        # skip this entity relation but continue others
-                        continue
+                # Precompute FK graph data
+                sf = (item.source_format or "unknown").lower()
+                for t in self._extract_table_defs(text):
+                    if t not in tables_by_format[sf]:
+                        tables_by_format[sf][t] = item.id
+                refs = self._extract_fk_refs(text)
+                if refs:
+                    fkrels_by_file[item.id].extend(refs)
+                doc_to_format[item.id] = sf
 
         refers_to_count = 0
         if create_refers_to:
-            pairs_done: Set[Tuple[int, int]] = set()
             with self.driver.session() as s:
-                for ent, doc_ids in entity_to_docs.items():
-                    ids = list(doc_ids)
-                    n = len(ids)
-                    for i in range(n):
-                        for j in range(n):
-                            if i == j:
+                for sf, tmap in tables_by_format.items():
+                    for src_doc, ref_tables in fkrels_by_file.items():
+                        if doc_to_format.get(src_doc) != sf:
+                            continue
+                        for rt in ref_tables:
+                            dst_doc = tmap.get(rt)
+                            if not dst_doc:
                                 continue
-                            a = ids[i]
-                            b = ids[j]
-                            if (a, b) in pairs_done:
+                            try:
+                                s.execute_write(
+                                    self._merge_refers_to_tx,
+                                    src_doc,
+                                    dst_doc,
+                                    "FOREIGN_KEY",
+                                )
+                                refers_to_count += 1
+                            except Exception:
                                 continue
-                            A = doc_to_entities.get(a, set())
-                            B = doc_to_entities.get(b, set())
-                            if not A or not B:
-                                continue
-                            inter = A.intersection(B)
-                            if not inter:
-                                continue
-                            union = A.union(B)
-                            overlap = len(inter)
-                            jacc = float(overlap) / float(len(union)) if union else 0.0
-                            s.execute_write(
-                                self._merge_refers_to_tx, a, b, overlap, jacc
-                            )
-                            refers_to_count += 1
-                            pairs_done.add((a, b))
 
         return IngestStats(
             documents=doc_count,
@@ -306,18 +296,6 @@ class Neo4jIO:
             )
             doc = doc_res["c"] if doc_res and "c" in doc_res else 0
 
-            ent_res = s.execute_read(
-                lambda tx: tx.run("MATCH (e:Entity) RETURN count(e) AS c").single()
-            )
-            ent = ent_res["c"] if ent_res and "c" in ent_res else 0
-
-            men_res = s.execute_read(
-                lambda tx: tx.run(
-                    "MATCH (:Document)-[r:MENTIONS]->(:Entity) RETURN count(r) AS c"
-                ).single()
-            )
-            men = men_res["c"] if men_res and "c" in men_res else 0
-
             ref_res = s.execute_read(
                 lambda tx: tx.run(
                     "MATCH (:Document)-[r:REFERS_TO]->(:Document) RETURN count(r) AS c"
@@ -327,7 +305,7 @@ class Neo4jIO:
 
             return {
                 "documents": doc,
-                "entities": ent,
-                "mentions": men,
+                "entities": 0,
+                "mentions": 0,
                 "refers_to": ref,
             }
