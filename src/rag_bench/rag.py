@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import json as _json
+import re as _re
 
 from .config import Config
 from .llm import OpenAIChat
@@ -164,10 +166,54 @@ def generate_search_query(
             {"role": "user", "content": user},
         ]
     )
-    # Take the first non-empty line
+    # Sanitize the LLM output to a single plain line of tokens
     content = (res.content or "").strip()
-    line = content.splitlines()[0] if content else ""
-    return line or question
+
+    def _strip_code_fences(s: str) -> str:
+        s = s.strip()
+        if s.startswith("```"):
+            # remove leading fence
+            s = s[3:]
+            # drop language tag if present
+            s = s.lstrip("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-")
+            # cut at ending fence if any
+            end = s.find("```")
+            if end != -1:
+                s = s[:end]
+        return s
+
+    def _from_json_like(s: str) -> Optional[str]:
+        s = s.strip()
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+            try:
+                obj = _json.loads(s)
+                # common shapes: {"query":"..."} or {"keywords":[...]} or list of strings
+                if isinstance(obj, dict):
+                    if isinstance(obj.get("query"), str):
+                        return obj["query"].strip()
+                    kw = obj.get("keywords")
+                    if isinstance(kw, list):
+                        return " ".join(str(x) for x in kw if x)
+                if isinstance(obj, list):
+                    return " ".join(str(x) for x in obj if isinstance(x, str))
+            except Exception:
+                return None
+        return None
+
+    raw = _strip_code_fences(content)
+    extracted = _from_json_like(raw)
+    if extracted is not None:
+        raw = extracted
+    # Collapse to single line and keep allowed characters
+    raw = raw.replace("\n", " ").replace("\r", " ")
+    # Allow alphanum, underscore, dash, slash, dot and space; drop the rest
+    raw = _re.sub(r"[^A-Za-z0-9_./\- ]+", " ", raw)
+    # Compress spaces
+    raw = _re.sub(r"\s+", " ", raw).strip()
+    # If too short or obviously broken (e.g., just a brace), fallback to question
+    if len(raw) < 3 or raw in {"{", "[", ")", "("}:
+        return question
+    return raw
 
 
 def answer_question(
