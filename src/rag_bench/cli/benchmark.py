@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
+from ..bench.runner import run_benchmark, run_index
 from ..config import Config
-from ..bench.runner import run_index, run_benchmark
 
 
 def main(argv: Optional[list[str]] = None) -> None:

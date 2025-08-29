@@ -7,9 +7,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
 from ..config import Config
-from ..fileloader import load_files
 from ..embeddings import OllamaEmbedder
-from ..utils.text import combined_text
+from ..fileloader import load_files
 
 
 class QdrantIO:

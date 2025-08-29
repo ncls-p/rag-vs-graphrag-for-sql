@@ -7,18 +7,18 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..config import Config
 from ..dataloader import load_records
-from ..parser import extract_entities
-from ..io.qdrant import QdrantIO
 from ..io.neo4j import Neo4jIO
-from ..retrievals.qdrant import QdrantRetriever
+from ..io.qdrant import QdrantIO
+from ..parser import extract_entities
 from ..retrievals.neo4j import Neo4jRetriever
+from ..retrievals.qdrant import QdrantRetriever
 from .metrics import (
     BackendMetrics,
     PerQueryRecord,
+    find_rank,
+    mrr_at_k,
     percentile,
     recall_at_k,
-    mrr_at_k,
-    find_rank,
 )
 
 

@@ -4,7 +4,7 @@ import argparse
 import json
 from typing import Optional
 
-from ..retrievals import QdrantRetriever, Neo4jRetriever
+from ..retrievals import Neo4jRetriever, QdrantRetriever
 
 
 def _cli_qdrant(args: argparse.Namespace) -> None:

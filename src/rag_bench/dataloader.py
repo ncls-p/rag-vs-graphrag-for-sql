@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .parser import (
-    iter_records as parse_qa_txt,
-    extract_entities,
     detect_doc_type,
+    extract_entities,
+)
+from .parser import (
+    iter_records as parse_qa_txt,
 )
 
 

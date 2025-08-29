@@ -3,13 +3,13 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from neo4j import GraphDatabase
 
 from ..config import Config
-from ..fileloader import load_files, FileItem
 from ..embeddings import OllamaEmbedder
+from ..fileloader import load_files
 
 
 @dataclass
