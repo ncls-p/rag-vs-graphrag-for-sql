@@ -16,6 +16,7 @@ from ..io.neo4j import Neo4jIO
 from ..io.qdrant import QdrantIO
 from ..retrievals.neo4j import Neo4jRetriever
 from ..retrievals.qdrant import QdrantRetriever
+from ..rag import answer_question, generate_search_query
 
 console = Console()
 
@@ -346,6 +347,78 @@ def _search() -> None:
     Confirm.ask("Back to menu?", default=True)
 
 
+def _ask() -> None:
+    _header("Ask (RAG)")
+    console.print(Panel.fit("Backend", style="cyan"))
+    console.print("[1] qdrant\n[2] neo4j")
+    bsel = Prompt.ask("Choose 1", default="1")
+    backend = "qdrant" if str(bsel).strip() != "2" else "neo4j"
+    if not backend:
+        return
+    question = Prompt.ask("Your question")
+    if not question:
+        return
+    fmt_list = _pick_format()
+    sf = fmt_list[0] if fmt_list else None
+    temp_str = Prompt.ask("LLM temperature", default="0.2")
+    try:
+        temperature = float(temp_str)
+    except Exception:
+        temperature = 0.2
+    tk_str = Prompt.ask("Top-K to retrieve", default="20")
+    try:
+        top_k = int(tk_str)
+    except Exception:
+        top_k = 20
+    instr = Prompt.ask(
+        "Custom instruction for query-generation (optional)", default=""
+    )
+
+    # 1) Generate retrieval query
+    try:
+        rq = generate_search_query(
+            question=question,
+            backend=backend,
+            source_format=sf,
+            instruction=(instr or None),
+        )
+    except Exception as e:
+        _error(f"Query generation failed: {e}")
+        Confirm.ask("Back to menu?", default=True)
+        return
+
+    # 2) Retrieve + answer
+    try:
+        ans = answer_question(
+            question=question,
+            backend=backend,
+            top_k=top_k,
+            source_format=sf,
+            retrieval_query=rq,
+            temperature=temperature,
+        )
+    except Exception as e:
+        _error(str(e))
+        Confirm.ask("Back to menu?", default=True)
+        return
+
+    # 3) Show result
+    console.print(Panel.fit(f"Retrieval query:\n{ans.retrieval_query}", title="Query"))
+    console.print(Panel.fit(ans.answer, title="Answer", border_style="green"))
+    if Confirm.ask("Show contexts?", default=False):
+        # Show up to 3 contexts trimmed
+        shown = 0
+        for c in ans.contexts:
+            preview = (c.get("content") or "")
+            if len(preview) > 800:
+                preview = preview[:800] + "..."
+            console.print(Panel(preview, title=f"doc {c.get('id')} score={c.get('score'):.3f}"))
+            shown += 1
+            if shown >= 3:
+                break
+    Confirm.ask("Back to menu?", default=True)
+
+
 def _stats() -> None:
     _header("Neo4j Stats")
     cfg = Config()
@@ -563,6 +636,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             ("Health Check", "health"),
             ("Index Knowledge Base", "index"),
             ("Search", "search"),
+            ("Ask (RAG)", "ask"),
             ("Neo4j Stats", "stats"),
             ("Benchmark", "bench"),
             ("Danger: Drop Qdrant Collections", "drop_qdrant"),
@@ -587,6 +661,8 @@ def main(argv: Optional[List[str]] = None) -> None:
             _index()
         elif choice == "search":
             _search()
+        elif choice == "ask":
+            _ask()
         elif choice == "stats":
             _stats()
         elif choice == "bench":
