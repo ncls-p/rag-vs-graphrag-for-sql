@@ -92,18 +92,18 @@ class Neo4jIO:
         tx.run(
             """
             MERGE (d:Document {id: $id})
-            SET d.path = $path,
-                d.source_format = $source_format,
+            SET d.source_format = $source_format,
                 d.size_bytes = $size_bytes,
+                d.content = $content,
                 d.embedding = $embedding
             FOREACH (_ IN CASE WHEN $sf = 'json' THEN [1] ELSE [] END | SET d:JSON)
             FOREACH (_ IN CASE WHEN $sf = 'txt' THEN [1] ELSE [] END | SET d:TXT)
             FOREACH (_ IN CASE WHEN $sf = 'xml' THEN [1] ELSE [] END | SET d:XML)
             """,
             id=rec["id"],
-            path=rec.get("source_path") or rec.get("path", ""),
             source_format=rec.get("source_format", "unknown"),
             size_bytes=int(rec.get("size_bytes", 0)),
+            content=rec.get("content", ""),
             sf=sf,
             embedding=embedding,
         )
@@ -238,9 +238,9 @@ class Neo4jIO:
                         self._merge_document_tx,
                         {
                             "id": item.id,
-                            "source_path": item.source_path,
                             "source_format": item.source_format,
                             "size_bytes": item.size_bytes,
+                            "content": text,
                         },
                         vec,
                     )

@@ -149,7 +149,7 @@ class QdrantIO:
                     )
             payload = {
                 "id": rid,
-                "path": f.source_path,
+                "content": text,
                 "source_format": f.source_format,
                 "size_bytes": f.size_bytes,
             }
