@@ -41,7 +41,7 @@ class OpenAIChat:
         max_tokens: Optional[int] = None,
         extra: Optional[Dict[str, Any]] = None,
     ) -> ChatResponse:
-        url = f"{self.base_url}/chat/completions"
+        url_chat = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -55,11 +55,69 @@ class OpenAIChat:
         if extra:
             body.update(extra)
         t0 = time.perf_counter()
-        resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=self.timeout)
-        resp.raise_for_status()
+
+        def _parse_openai_like(d: Dict[str, Any]) -> str:
+            # Standard Chat Completions
+            if isinstance(d.get("choices"), list) and d["choices"]:
+                msg = d["choices"][0].get("message") or {}
+                if isinstance(msg, dict):
+                    return str(msg.get("content") or "")
+            # Responses API content list (some providers)
+            if isinstance(d.get("content"), list) and d["content"]:
+                parts = []
+                for it in d["content"]:
+                    if isinstance(it, dict) and it.get("type") == "output_text":
+                        parts.append(str(it.get("text") or ""))
+                    elif isinstance(it, dict) and "text" in it:
+                        parts.append(str(it.get("text") or ""))
+                if parts:
+                    return "".join(parts)
+            # Fallback keys used by some gateways
+            if isinstance(d.get("output_text"), str):
+                return d["output_text"]
+            if isinstance(d.get("text"), str):
+                return d["text"]
+            return ""
+
+        # Try Chat Completions
+        resp = requests.post(url_chat, headers=headers, data=json.dumps(body), timeout=self.timeout)
+        if not resp.ok:
+            # Improve error message; include API response body if available
+            try:
+                errj = resp.json()
+                emsg = errj.get("error", {}).get("message") or errj.get("message") or resp.text
+            except Exception:
+                emsg = resp.text
+            # Fallback: try /responses for providers that don't support /chat/completions
+            url_resp = f"{self.base_url}/responses"
+            payload = {
+                "model": self.model,
+                # Join messages to a single prompt
+                "input": "\n".join([f"{m.get('role')}: {m.get('content')}" for m in messages]),
+                "temperature": temperature,
+            }
+            if max_tokens is not None:
+                payload["max_output_tokens"] = max_tokens
+            try:
+                r2 = requests.post(url_resp, headers=headers, data=json.dumps(payload), timeout=self.timeout)
+                r2.raise_for_status()
+                data2 = r2.json()
+                content2 = _parse_openai_like(data2)
+                usage2 = data2.get("usage") or {}
+                elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                return ChatResponse(
+                    content=content2,
+                    model=data2.get("model") or self.model,
+                    prompt_tokens=usage2.get("prompt_tokens"),
+                    completion_tokens=usage2.get("completion_tokens"),
+                    total_tokens=usage2.get("total_tokens"),
+                    elapsed_ms=elapsed_ms,
+                )
+            except Exception:
+                raise RuntimeError(f"OpenAI chat error {resp.status_code}: {emsg}")
+
         data = resp.json()
-        # OpenAI compatible response
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        content = _parse_openai_like(data)
         usage = data.get("usage") or {}
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         return ChatResponse(
@@ -70,4 +128,3 @@ class OpenAIChat:
             total_tokens=usage.get("total_tokens"),
             elapsed_ms=elapsed_ms,
         )
-
