@@ -95,3 +95,8 @@ class Config:
         if not host or not port:
             return False, f"Invalid NEO4J_URI: {self.neo4j_uri}"
         return self._socket_check(host, port)
+
+    # OpenAI-compatible Chat API
+    openai_base_url: str = os.environ.get("OPENAI_BASE_URL", "http://localhost:1234/v1")
+    openai_api_key: Optional[str] = os.environ.get("OPENAI_API_KEY") or None
+    openai_model: str = os.environ.get("OPENAI_MODEL", os.environ.get("OPENAI_CHAT_MODEL", "gpt-3.5-turbo"))

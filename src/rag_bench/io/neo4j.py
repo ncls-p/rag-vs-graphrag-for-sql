@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -145,6 +147,155 @@ class Neo4jIO:
             refs.append(norm)
         return refs
 
+    # --- JSON structured heuristics ---
+    @staticmethod
+    def _extract_table_defs_json(obj: Any) -> List[str]:
+        out: Set[str] = set()
+
+        def norm(x: Any) -> Optional[str]:
+            if isinstance(x, str) and x.strip():
+                return x.strip().strip('`"').upper()
+            return None
+
+        def walk(o: Any) -> None:
+            if isinstance(o, dict):
+                keys = {str(k).lower() for k in o.keys()}
+                name_val = o.get("table") or o.get("table_name") or o.get("name")
+                if name_val is not None and (
+                    {"columns", "fields", "schema", "primary_key", "foreign_keys"}
+                    & keys
+                ):
+                    n = norm(name_val)
+                    if n:
+                        out.add(n)
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for it in o:
+                    walk(it)
+
+        walk(obj)
+        return list(out)
+
+    @staticmethod
+    def _extract_fk_refs_json(obj: Any) -> List[str]:
+        out: Set[str] = set()
+        fk_keys = {
+            "foreign_key",
+            "foreignKey",
+            "fk",
+            "references",
+            "ref_table",
+            "refTable",
+            "target_table",
+            "targetTable",
+        }
+
+        def norm(x: Any) -> Optional[str]:
+            if isinstance(x, str) and x.strip():
+                return x.strip().strip('`"').upper()
+            return None
+
+        def collect(v: Any) -> None:
+            if isinstance(v, dict):
+                for key in (
+                    "table",
+                    "ref_table",
+                    "refTable",
+                    "references",
+                    "target_table",
+                    "targetTable",
+                ):
+                    n = norm(v.get(key))
+                    if n:
+                        out.add(n)
+                for vv in v.values():
+                    collect(vv)
+            elif isinstance(v, list):
+                for it in v:
+                    collect(it)
+            else:
+                n = norm(v)
+                if n:
+                    out.add(n)
+
+        def walk(o: Any) -> None:
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    if str(k) in fk_keys:
+                        collect(v)
+                    walk(v)
+            elif isinstance(o, list):
+                for it in o:
+                    walk(it)
+
+        walk(obj)
+        return list(out)
+
+    # --- XML structured heuristics ---
+    @staticmethod
+    def _extract_table_defs_xml(root: ET.Element) -> List[str]:
+        out: Set[str] = set()
+
+        def lname(tag: str) -> str:
+            return tag.split("}", 1)[-1].lower()
+
+        def norm(s: Optional[str]) -> Optional[str]:
+            if s and s.strip():
+                return s.strip().strip('`"').upper()
+            return None
+
+        for elem in root.iter():
+            t = lname(elem.tag)
+            if t in {"table", "createtable", "create-table"}:
+                n = norm(elem.get("name") or (elem.text or ""))
+                if n:
+                    out.add(n)
+            child_tags = {lname(c.tag) for c in list(elem)}
+            if (
+                "columns" in child_tags
+                or "column" in child_tags
+                or "fields" in child_tags
+            ) and elem.get("name"):
+                n = norm(elem.get("name"))
+                if n:
+                    out.add(n)
+        return list(out)
+
+    @staticmethod
+    def _extract_fk_refs_xml(root: ET.Element) -> List[str]:
+        out: Set[str] = set()
+
+        def lname(tag: str) -> str:
+            return tag.split("}", 1)[-1].lower()
+
+        def norm(s: Optional[str]) -> Optional[str]:
+            if s and s.strip():
+                return s.strip().strip('`"').upper()
+            return None
+
+        for elem in root.iter():
+            t = lname(elem.tag)
+            if t in {"foreign-key", "foreignkey", "fk", "references"}:
+                for key in ("table", "ref-table", "references", "target-table"):
+                    n = norm(elem.get(key))
+                    if n:
+                        out.add(n)
+                for child in list(elem):
+                    cn = lname(child.tag)
+                    if cn in {
+                        "table",
+                        "ref-table",
+                        "references",
+                        "target-table",
+                        "targettable",
+                        "reftable",
+                    }:
+                        n = norm((child.text or ""))
+                        if n:
+                            out.add(n)
+        return list(out)
+
     def ingest(
         self,
         data_path: Path,
@@ -249,12 +400,29 @@ class Neo4jIO:
                     continue
                 doc_count += 1
 
-                # Precompute FK graph data
+                # Precompute FK graph data (SQL-like + structured JSON/XML)
                 sf = (item.source_format or "unknown").lower()
-                for t in self._extract_table_defs(text):
+                # SQL-like patterns from raw text
+                tables = set(self._extract_table_defs(text))
+                refs = list(self._extract_fk_refs(text))
+                # Structured formats
+                if sf == "json":
+                    try:
+                        obj = json.loads(text)
+                        tables.update(self._extract_table_defs_json(obj))
+                        refs.extend(self._extract_fk_refs_json(obj))
+                    except Exception:
+                        pass
+                elif sf == "xml":
+                    try:
+                        root = ET.fromstring(text)
+                        tables.update(self._extract_table_defs_xml(root))
+                        refs.extend(self._extract_fk_refs_xml(root))
+                    except Exception:
+                        pass
+                for t in tables:
                     if t not in tables_by_format[sf]:
                         tables_by_format[sf][t] = item.id
-                refs = self._extract_fk_refs(text)
                 if refs:
                     fkrels_by_file[item.id].extend(refs)
                 doc_to_format[item.id] = sf

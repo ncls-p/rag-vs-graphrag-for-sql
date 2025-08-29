@@ -21,6 +21,7 @@ rag-retrieval = "rag_bench.cli.retrieval:main"
 rag-qdrant = "rag_bench.cli.qdrant:main"
 rag-neo4j = "rag_bench.cli.neo4j:main"
 rag = "rag_bench.cli.interactive:main"
+rag-ask = "rag_bench.cli.ask:main"
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]

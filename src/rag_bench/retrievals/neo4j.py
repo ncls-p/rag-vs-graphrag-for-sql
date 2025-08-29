@@ -129,8 +129,7 @@ class Neo4jRetriever:
                     lambda tx, ids, sfs: list(
                         tx.run(
                             "MATCH (d:Document) WHERE d.id IN $ids AND d.source_format IN $sfs "
-                            "RETURN d.id AS id, d.question AS question, d.answer_text AS answer_text, "
-                            "d.entities AS entities, d.doc_type AS doc_type",
+                            "RETURN d.id AS id, d.content AS content, d.source_format AS source_format",
                             ids=ids,
                             sfs=[sf.lower() for sf in sfs],
                         )
@@ -143,8 +142,7 @@ class Neo4jRetriever:
                     lambda tx, ids, sf: list(
                         tx.run(
                             "MATCH (d:Document) WHERE d.id IN $ids AND d.source_format = $sf "
-                            "RETURN d.id AS id, d.question AS question, d.answer_text AS answer_text, "
-                            "d.entities AS entities, d.doc_type AS doc_type",
+                            "RETURN d.id AS id, d.content AS content, d.source_format AS source_format",
                             ids=ids,
                             sf=sf,
                         )
@@ -157,8 +155,7 @@ class Neo4jRetriever:
                     lambda tx, ids: list(
                         tx.run(
                             "MATCH (d:Document) WHERE d.id IN $ids "
-                            "RETURN d.id AS id, d.question AS question, d.answer_text AS answer_text, "
-                            "d.entities AS entities, d.doc_type AS doc_type",
+                            "RETURN d.id AS id, d.content AS content, d.source_format AS source_format",
                             ids=ids,
                         )
                     ),
@@ -167,10 +164,8 @@ class Neo4jRetriever:
         for r in rows:
             pid = int(r["id"])
             payloads[pid] = {
-                "question": r["question"],
-                "answer_text": r["answer_text"],
-                "entities": r["entities"],
-                "doc_type": r["doc_type"],
+                "content": r.get("content"),
+                "source_format": r.get("source_format"),
             }
         return payloads
 
