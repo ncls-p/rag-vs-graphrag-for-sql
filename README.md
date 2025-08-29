@@ -79,7 +79,7 @@ Environment variables (defaults in `src/rag_bench/config.py`):
 |---------|---------|-------------|
 | OLLAMA_BASE_URL | http://localhost:11434 | Base URL for embedding server |
 | OLLAMA_EMBED_MODEL | dengcao/Qwen3-Embedding-0.6B:q8_0 | Embedding model name |
-| HTTP_TIMEOUT_SECONDS | 30 | HTTP timeout per request |
+| HTTP_TIMEOUT_SECONDS | 600 | HTTP timeout per request |
 | REQUEST_RETRIES | 3 | HTTP retry count |
 | QDRANT_URL | http://localhost:6333 | Qdrant base URL |
 | QDRANT_API_KEY | – | Qdrant API key (optional) |

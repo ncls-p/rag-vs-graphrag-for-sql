@@ -14,7 +14,7 @@ class Config:
     ollama_model: str = os.environ.get(
         "OLLAMA_EMBED_MODEL", "dengcao/Qwen3-Embedding-0.6B:q8_0"
     )
-    http_timeout_seconds: float = float(os.environ.get("HTTP_TIMEOUT_SECONDS", "30"))
+    http_timeout_seconds: float = float(os.environ.get("HTTP_TIMEOUT_SECONDS", "600"))
     request_retries: int = int(os.environ.get("REQUEST_RETRIES", "3"))
 
     # Qdrant
